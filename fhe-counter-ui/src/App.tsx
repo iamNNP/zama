@@ -6,7 +6,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { initSDK, createInstance, SepoliaConfig } from "@zama-fhe/relayer-sdk/bundle";
 import { ethers } from "ethers";
 import type { EIP712, FhevmInstance } from "@zama-fhe/relayer-sdk/bundle";
-import { GM_CONTRACT_ADDRESS, CONTRACT_ABI } from "./fheConfig";
+import { GM_CONTRACT_ADDRESS, CONTRACT_ABI, FHE_COUNTER_BYTECODE, FHE_COUNTER_ABI } from "./fheConfig";
 import "./App.css";
 
 let instance: any = null;
@@ -28,21 +28,40 @@ async function getInstance() {
 }
 
 function App() {
-  useEffect(() => {
-    const setup = async () => {
-      const provider = new ethers.BrowserProvider(window.ethereum);
-      await provider.send("eth_requestAccounts", []);
-      signer = await provider.getSigner();
-      await initInstance();
+  const [account, setAccount] = useState<string | null>(null);
+  const [connected, setConnected] = useState(false);
+  // useEffect(() => {
+  //   const setup = async () => {
+  //     const provider = new ethers.BrowserProvider(window.ethereum);
+  //     await provider.send("eth_requestAccounts", []);
+  //     signer = await provider.getSigner();
+  //     await initInstance();
 
-      contract = new ethers.Contract(GM_CONTRACT_ADDRESS, CONTRACT_ABI, signer);
-      console.log("instance : ", getInstance());
-      console.log("signer: ", signer);
-      console.log("contract: ", contract);
-    };
+  //     contract = new ethers.Contract(GM_CONTRACT_ADDRESS, CONTRACT_ABI, signer);
+  //     console.log("instance : ", getInstance());
+  //     console.log("signer: ", signer);
+  //     console.log("contract: ", contract);
+  //   };
 
-    setup();
-  }, []);
+  //   setup();
+  // }, []);
+
+  const connectWallet = async () => {
+    if (!window.ethereum) return;
+
+    const provider = new ethers.BrowserProvider(window.ethereum);
+    await provider.send("eth_requestAccounts", []);
+    signer = await provider.getSigner();
+    const address = await signer.getAddress();
+    setAccount(address);
+    setConnected(true);
+
+    await initInstance();
+    contract = new ethers.Contract(GM_CONTRACT_ADDRESS, CONTRACT_ABI, signer);
+    console.log("instance : ", getInstance());
+    console.log("signer: ", signer);
+    console.log("contract: ", contract);
+  };
 
   // const refresh = async () => {
   //   const enc = await contract.getCount();
@@ -94,6 +113,16 @@ function App() {
     await contract.gm(handles[0], inputProof);
   };
 
+  const deployContract = async (signer: ethers.Signer) => {
+    const factory = new ethers.ContractFactory(FHE_COUNTER_ABI, FHE_COUNTER_BYTECODE, signer);
+    const contract = await factory.deploy(); // Add constructor args if needed
+    await contract.waitForDeployment();
+
+    const address = await contract.getAddress();
+    alert(`Contract deployed at: ${address}`);
+    return address;
+  };
+
   if (!window.ethereum)
     return (
       <>
@@ -104,8 +133,22 @@ function App() {
   return (
     <>
       <h1>GMZAMA</h1>
-      <br />
-      <button onClick={gm}>GM</button>
+      {!connected ? (
+        <button onClick={connectWallet} className="connect-button">
+          Connect Wallet
+        </button>
+      ) : (
+        <>
+          <button disabled className="connect-button">
+            Connected as: {account?.substring(0, 5) + "..." + account?.substring(account.length - 3, account.length)}
+          </button>
+          <button onClick={gm}>GM</button>
+          <br />
+          <br />
+          <br />
+          {connected && <button onClick={() => deployContract(signer)}>Deploy Contract</button>}
+        </>
+      )}
     </>
   );
 }
