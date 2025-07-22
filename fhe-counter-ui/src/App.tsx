@@ -6,7 +6,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { initSDK, createInstance, SepoliaConfig } from "@zama-fhe/relayer-sdk/bundle";
 import { ethers } from "ethers";
 import type { EIP712, FhevmInstance } from "@zama-fhe/relayer-sdk/bundle";
-import { CONTRACT_ADDRESS, CONTRACT_ABI } from "./fheConfig";
+import { GM_CONTRACT_ADDRESS, CONTRACT_ABI } from "./fheConfig";
 import "./App.css";
 
 let instance: any = null;
@@ -28,7 +28,6 @@ async function getInstance() {
 }
 
 function App() {
-  const [count, setCount] = useState<any>(null);
   useEffect(() => {
     const setup = async () => {
       const provider = new ethers.BrowserProvider(window.ethereum);
@@ -36,7 +35,7 @@ function App() {
       signer = await provider.getSigner();
       await initInstance();
 
-      contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
+      contract = new ethers.Contract(GM_CONTRACT_ADDRESS, CONTRACT_ABI, signer);
       console.log("instance : ", getInstance());
       console.log("signer: ", signer);
       console.log("contract: ", contract);
@@ -45,55 +44,54 @@ function App() {
     setup();
   }, []);
 
-  const refresh = async () => {
-    const enc = await contract.getCount();
-    console.log("Enc: ", enc);
+  // const refresh = async () => {
+  //   const enc = await contract.getCount();
+  //   console.log("Enc: ", enc);
 
-    instance = await getInstance();
-    keypair = await instance.generateKeypair();
-    const handleContractPairs = [
-      {
-        handle: String(enc),
-        contractAddress: CONTRACT_ADDRESS,
-      },
-    ];
-    startTimestamp = Math.floor(Date.now() / 1000).toString();
-    const durationDays = "10"; // String for consistency
-    const contractAddresses = [CONTRACT_ADDRESS];
+  //   instance = await getInstance();
+  //   keypair = await instance.generateKeypair();
+  //   const handleContractPairs = [
+  //     {
+  //       handle: String(enc),
+  //       contractAddress: GM_CONTRACT_ADDRESS,
+  //     },
+  //   ];
+  //   startTimestamp = Math.floor(Date.now() / 1000).toString();
+  //   const durationDays = "10"; // String for consistency
+  //   const contractAddresses = [GM_CONTRACT_ADDRESS];
 
-    eip712 = instance.createEIP712(keypair.publicKey, contractAddresses, startTimestamp, durationDays);
+  //   eip712 = instance.createEIP712(keypair.publicKey, contractAddresses, startTimestamp, durationDays);
 
-    const signature = await signer.signTypedData(
-      eip712.domain,
-      {
-        UserDecryptRequestVerification: eip712.types.UserDecryptRequestVerification,
-      },
-      eip712.message,
-    );
+  //   const signature = await signer.signTypedData(
+  //     eip712.domain,
+  //     {
+  //       UserDecryptRequestVerification: eip712.types.UserDecryptRequestVerification,
+  //     },
+  //     eip712.message,
+  //   );
 
-    const result = await instance.userDecrypt(
-      handleContractPairs,
-      keypair.privateKey,
-      keypair.publicKey,
-      signature.replace("0x", ""),
-      contractAddresses,
-      signer.address,
-      startTimestamp,
-      durationDays,
-    );
+  //   const result = await instance.userDecrypt(
+  //     handleContractPairs,
+  //     keypair.privateKey,
+  //     keypair.publicKey,
+  //     signature.replace("0x", ""),
+  //     contractAddresses,
+  //     signer.address,
+  //     startTimestamp,
+  //     durationDays,
+  //   );
 
-    const dec = result[String(enc)];
-    console.log("Dec: ", dec);
-    setCount(dec.toString());
-  };
+  //   const dec = result[String(enc)];
+  //   console.log("Dec: ", dec);
+  //   setCount(dec.toString());
+  // };
 
-  const increment = async () => {
-    const encryptedInput = await instance.createEncryptedInput(CONTRACT_ADDRESS, await signer.getAddress());
+  const gm = async () => {
+    const encryptedInput = await instance.createEncryptedInput(GM_CONTRACT_ADDRESS, await signer.getAddress());
     encryptedInput.add32(1);
     const { handles, inputProof } = await encryptedInput.encrypt();
 
-    await contract.increment(handles[0], inputProof);
-    await refresh();
+    await contract.gm(handles[0], inputProof);
   };
 
   if (!window.ethereum)
@@ -105,13 +103,9 @@ function App() {
 
   return (
     <>
-      <h1>FHE Counter</h1>
-      <p>Value: {count}</p>
-      <button onClick={increment}>+1</button>
+      <h1>GMZAMA</h1>
       <br />
-      <br />
-      <br />
-      <button onClick={refresh}>Refresh</button>
+      <button onClick={gm}>GM</button>
     </>
   );
 }
