@@ -3,6 +3,7 @@
 // import { createInstance, SepoliaConfig } from "@zama-fhe/relayer-sdk/bundle";
 // import { CONTRACT_ADDRESS, CONTRACT_ABI } from "./fheConfig";
 import { useEffect, useState, type ReactNode } from "react";
+import moment from "moment";
 import { initSDK, createInstance, SepoliaConfig } from "@zama-fhe/relayer-sdk/bundle";
 import { ethers } from "ethers";
 import type { EIP712, FhevmInstance } from "@zama-fhe/relayer-sdk/bundle";
@@ -106,11 +107,61 @@ function App() {
   // };
 
   const gm = async () => {
-    const encryptedInput = await instance.createEncryptedInput(GM_CONTRACT_ADDRESS, await signer.getAddress());
-    encryptedInput.add32(1);
-    const { handles, inputProof } = await encryptedInput.encrypt();
+    const enc = await contract.getTimestamp();
+    console.log("Enc: ", enc);
 
-    await contract.gm(handles[0], inputProof);
+    instance = await getInstance();
+    keypair = await instance.generateKeypair();
+    const handleContractPairs = [
+      {
+        handle: String(enc),
+        contractAddress: GM_CONTRACT_ADDRESS,
+      },
+    ];
+    startTimestamp = Math.floor(Date.now() / 1000).toString();
+    const durationDays = "10"; // String for consistency
+    const contractAddresses = [GM_CONTRACT_ADDRESS];
+
+    eip712 = instance.createEIP712(keypair.publicKey, contractAddresses, startTimestamp, durationDays);
+
+    const signature = await signer.signTypedData(
+      eip712.domain,
+      {
+        UserDecryptRequestVerification: eip712.types.UserDecryptRequestVerification,
+      },
+      eip712.message,
+    );
+
+    const result = await instance.userDecrypt(
+      handleContractPairs,
+      keypair.privateKey,
+      keypair.publicKey,
+      signature.replace("0x", ""),
+      contractAddresses,
+      signer.address,
+      startTimestamp,
+      durationDays,
+    );
+
+    const dec = result[String(enc)];
+    console.log("Dec: ", dec);
+
+    const timeUntilNextGM = dec + BigInt(12 * 60 * 60) - BigInt(moment().format("X"));
+    if (timeUntilNextGM < 0) {
+      const encryptedInput = await instance.createEncryptedInput(GM_CONTRACT_ADDRESS, await signer.getAddress());
+      encryptedInput.add32(1);
+      const { handles, inputProof } = await encryptedInput.encrypt();
+
+      await contract.gm(handles[0], inputProof);
+      alert("Successful GM!");
+    }
+    alert(
+      "Wait for " +
+        moment
+          .utc(1000 * Number(timeUntilNextGM))
+          .format("HH:mm:ss")
+          .toString(),
+    );
   };
 
   const deployContract = async (signer: ethers.Signer) => {
